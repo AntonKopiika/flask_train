@@ -1,12 +1,16 @@
 from flask import Flask, render_template, request, escape
 from search4.search4letters import search4letters
 
+from DBcm import UseDatabase
 app = Flask(__name__)
-
+db_config = {'host': '127.0.0.1', 'user': 'vsearch', 'database': 'vsearchlogDB'}
 
 def log_request(req: 'flask_request', res: str) -> None:
-    with open('vsearch.log', 'a') as log:
-        print(req.form, req.remote_addr, req.user_agent, res, file=log, sep="|")
+
+    with UseDatabase(db_config) as cursor:
+        _SQL = """insert into log (phrase, letters, ip, browser_string, results) values 
+                (%s,%s,%s,%s,%s)"""
+        cursor.execute(_SQL, (req.form["phrase"], req.form["letters"], req.remote_addr, req.user_agent.browser, res))
 
 
 @app.route('/search4', methods=['POST'])
@@ -27,12 +31,10 @@ def entry_page() -> 'html':
 
 @app.route('/viewlog')
 def view_log() -> 'html':
-    contents = []
-    with open("vsearch.log", "r") as log:
-        for line in log:
-            contents.append([])
-            for item in line.split("|"):
-                contents[-1].append(escape(item))
+    with UseDatabase(db_config) as cursor:
+        _SQL = """SELECT phrase, letters, ip, browser_string, results FROM log"""
+        cursor.execute(_SQL)
+        contents = cursor.fetchall()
     return render_template('viewlog.html', the_title=" User log ", logs=contents)
 
 
